@@ -1,0 +1,55 @@
+"""Ported verbatim from the Cortex backend suite (test_compression.py) — proves the copied engine
+behaves identically. Only the imports changed."""
+
+import httpx
+import pytest
+
+from cortexlayer._engine import compression
+
+
+def _stub_chat(content: str):
+    def chat(prompt: str, model: str) -> str:
+        chat.last_prompt = prompt
+        chat.last_model = model
+        return content
+
+    return chat
+
+
+PASSAGES = [
+    {"page_id": "aaa", "text": "The director of Inception is Christopher Nolan."},
+    {"page_id": "bbb", "text": "Christopher Nolan was born on July 30, 1970."},
+]
+
+
+def test_compress_parses_answer_and_ids():
+    chat = _stub_chat('{"answer": "1970", "source_page_ids": ["bbb"]}')
+    result = compression.compress("When was Nolan born?", PASSAGES, _chat=chat)
+    assert result == {"answer": "1970", "source_page_ids": ["bbb"]}
+    assert "bbb" in chat.last_prompt and "1970" in chat.last_prompt
+
+
+def test_include_passage_adds_raw_text():
+    chat = _stub_chat('{"answer": "1970", "source_page_ids": ["bbb"]}')
+    result = compression.compress(
+        "When was Nolan born?", PASSAGES, include_passage=True, _chat=chat
+    )
+    assert "1970" in result["source_passage"]
+    assert "Inception" in result["source_passage"]
+
+
+def test_garbage_response_falls_back_gracefully():
+    chat = _stub_chat("not json at all")
+    result = compression.compress("When was Nolan born?", PASSAGES, _chat=chat)
+    assert result["answer"] == "not json at all"
+    assert result["source_page_ids"] == ["aaa", "bbb"]
+
+
+def test_live_ollama_call():
+    """End-to-end against local Ollama. Skipped when the server is down."""
+    try:
+        result = compression.compress("When was Nolan born?", PASSAGES)
+    except (httpx.ConnectError, httpx.RemoteProtocolError, httpx.ReadTimeout):
+        pytest.skip("Ollama server not reachable")
+    assert result["answer"]
+    assert result["source_page_ids"]

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cortexlayer"
+dynamic = ["version"]
+description = "Cortex: a memory layer for AI agents (linked pages + link-expansion retrieval) — hosted client and embedded engine."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+dependencies = ["httpx>=0.27"]
+keywords = ["memory", "agents", "llm", "mcp", "rag", "cortex"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+# The embedded engine (`Memory`): Chroma vector store + spaCy entity extraction.
+local = ["chromadb>=1.0", "spacy>=3.7"]
+dev = ["cortexlayer[local]", "pytest>=8.0", "build>=1.2"]
+
+[tool.setuptools.dynamic]
+version = { attr = "cortexlayer._version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+cortexlayer = ["py.typed", "_engine/facts/*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
