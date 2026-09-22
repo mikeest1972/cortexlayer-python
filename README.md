@@ -13,9 +13,10 @@ Two ways to use it, with the same method names and result types:
 
 Python 3.10+. The client needs only `httpx`; the embedded engine adds Chroma and spaCy.
 
-> **Status: 0.1 (alpha), not yet on PyPI.** Local `Memory` has two engines: `raw` (default, no LLM)
-> and `facts` (Mem0-style LLM fact extraction; see below). The Cortex server runs on this same library:
-> its `facts` backend is `Memory(backend="facts")`, and it no longer depends on the `mem0ai` package.
+> **Status: 0.1 (alpha), on PyPI as [`cortexlayer`](https://pypi.org/project/cortexlayer/).** Local
+> `Memory` has two engines: `raw` (default, no LLM) and `facts` (Mem0-style LLM fact extraction; see
+> below). The Cortex server runs on this same library: its `facts` backend is `Memory(backend="facts")`,
+> and it no longer depends on the `mem0ai` package. Source: [GitHub](https://github.com/mikeest1972/cortexlayer-python).
 
 ## Quickstart: embedded (`Memory`)
 

@@ -20,6 +20,11 @@ classifiers = [
     "Typing :: Typed",
 ]
 
+[project.urls]
+Homepage = "https://github.com/mikeest1972/cortexlayer-python"
+Repository = "https://github.com/mikeest1972/cortexlayer-python"
+Issues = "https://github.com/mikeest1972/cortexlayer-python/issues"
+
 [project.optional-dependencies]
 # The embedded engine (`Memory`): Chroma vector store + spaCy entity extraction.
 local = ["chromadb>=1.0", "spacy>=3.7"]
