@@ -4,6 +4,32 @@ Python library for **Cortex**, a memory layer for AI agents. Cortex stores memor
 pages and retrieves with vector search **plus link-expansion**, so multi-hop facts come back
 without over-fetching a large top-k.
 
+```bash
+# Step 1 — install (run in your terminal, not in Python):
+pip install "cortexlayer[local]"
+python -m spacy download en_core_web_sm   # optional, better entity extraction
+```
+
+```python
+# Step 2 — save this as hello_cortex.py and run with: python hello_cortex.py
+from cortexlayer import Memory
+
+m = Memory("./cortex-data")   # local store; omit the path for ~/.cortexlayer
+
+m.add("Christopher Nolan directed Inception.", user_id="alice")
+m.add("Christopher Nolan was born in London in 1970.", user_id="alice")
+m.relink(user_id="alice")     # batch linking pass, run after adding several
+
+for r in m.search("Who directed Inception?", user_id="alice", limit=1):
+    print(r.title, "-", r.via)
+
+# Christopher Nolan directed Inception. - direct
+# Christopher Nolan was born in London in 1970. - link   <- pulled in through the shared entity
+```
+
+No server, no API key, nothing to sign up for — it runs fully on your machine. See below for the
+hosted `CortexClient` and the `facts` engine (Mem0-style LLM fact extraction).
+
 Two ways to use it, with the same method names and result types:
 
 | | What it is | Install |
@@ -17,6 +43,37 @@ Python 3.10+. The client needs only `httpx`; the embedded engine adds Chroma and
 > `Memory` has two engines: `raw` (default, no LLM) and `facts` (Mem0-style LLM fact extraction; see
 > below). The Cortex server runs on this same library: its `facts` backend is `Memory(backend="facts")`,
 > and it no longer depends on the `mem0ai` package. Source: [GitHub](https://github.com/mikeest1972/cortexlayer-python).
+
+## Benchmarks
+
+Measured on [LOCOMO](https://github.com/snap-research/locomo) — all 1,540 non-adversarial questions,
+`Memory(backend="raw")`, `qwen3.5:9b` as answerer, k=4 — against Mem0's own published numbers (arXiv
+2504.19413, Tables 1–2, GPT-4o-mini pipeline):
+
+| Category | cortexlayer F1 | Mem0 F1 | cortexlayer tokens | Mem0 tokens |
+|---|---|---|---|---|
+| single-hop | 0.357 | 0.387 | 719 | 1,764 |
+| multi-hop | 0.273 | 0.286 | 796 | 1,764 |
+| temporal | 0.480 | 0.489 | 740 | 1,764 |
+| open-domain | 0.170 | 0.476 | 751 | 1,764 |
+
+**Near-parity with Mem0 on 3 of 4 categories**, at ~55&ndash;60% fewer retrieval tokens — plus a
+compression pass that shrinks context further to ~7 tokens/answer, a lever Mem0 has no equivalent of.
+Open-domain (inference/judgment questions, not fact lookup) is the one real gap left: GPT-4o-mini has
+a genuine reasoning-capacity edge there that retrieval quality alone doesn't close.
+
+Different answerer models on each side (local `qwen3.5:9b` vs GPT-4o-mini), so token counts and
+retrieval architecture are the fair comparison, not a fully controlled one. Deterministic token-F1,
+no LLM judge. Reproduce with the benchmark harness in the Cortex server repo
+(`benchmark/run_locomo.py` + `benchmark/compare_mem0.py`).
+
+**What about no memory layer — just raw notes (e.g. an Obsidian vault) dumped straight into the
+prompt?** Mem0's own paper runs that baseline too ("Full-Context Processing": no retrieval, the
+whole ~26k-token conversation pasted into context every query). It actually beats Mem0 on their
+LLM-judge score (72.9% vs 66.9%) — but at ~15x the tokens and ~12x the latency (p95 17.1s vs 1.44s),
+and their own paper notes it doesn't scale: cost grows with how much you've ever written down, not
+with what's relevant to the question. Fine for a small note collection that still fits in one
+context window; not for memory that keeps growing.
 
 ## Quickstart: embedded (`Memory`)
 
