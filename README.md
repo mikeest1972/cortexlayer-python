@@ -70,8 +70,9 @@ Same numbers shown on [www.cortexlayer.net](https://www.cortexlayer.net).
 **vs. no memory layer.** What if you skipped retrieval entirely and just pasted the raw conversation
 (or an Obsidian vault of notes) into the prompt every time? An average LOCOMO conversation runs about
 26,031 tokens (Maharana et al. 2024), whether or not any of it is relevant to the question — cortexlayer
-retrieves 719&ndash;796, a **~97% reduction**, before the compression pass shrinks that further to
-~7 tokens/answer.
+retrieves 719&ndash;796 (a **~97% reduction** on its own), then the compression pass shrinks that
+further to ~7 tokens/answer (another **~99%** on top of that). Chained together, the final answer is
+built from **&gt;99.9% fewer tokens** than pasting the whole conversation in, end to end.
 
 That cost stays flat as memory grows. Pasting everything in doesn't — it scales with everything
 you've ever written down, not with what the question needs, and stops fitting in context at all once
