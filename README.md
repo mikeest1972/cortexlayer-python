@@ -56,26 +56,26 @@ Python 3.10+. The client needs only `httpx`; the embedded engine adds Chroma and
 
 ## Benchmarks
 
-Why bother with a memory layer at all, instead of just keeping plain notes and pasting the whole
-thing into the prompt every time? Measured on [LOCOMO](https://github.com/snap-research/locomo),
-citing a published ablation (arXiv 2504.19413) that ran exactly that baseline — "Full-Context
-Processing": the full ~26k-token conversation, pasted whole, every query — against a retrieval-based
-memory layer:
+Measured on [LOCOMO](https://github.com/snap-research/locomo) — all 1,540 non-adversarial questions,
+`Memory(backend="raw")`, `qwen3.5:9b` as answerer locally, k=4. Deterministic token-F1, no LLM judge.
+Same numbers shown on [www.cortexlayer.net](https://www.cortexlayer.net).
 
-| | LLM-judge score | Tokens/query | p95 latency |
+| Category | F1 | Retrieved tokens | Compressed tokens |
 |---|---|---|---|
-| Full context (no memory layer) | **72.9%** | ~26,000 | 17.1s |
-| Retrieval-based memory | 66.9% | ~1,764 | 1.44s |
+| single-hop | 0.357 | 719 | 7.5 |
+| multi-hop | 0.273 | 796 | 7.6 |
+| temporal | 0.480 | 740 | 8.2 |
+| open-domain | 0.170 | 751 | 6.3 |
 
-Reading the whole file actually **beats** retrieval-based memory on accuracy — right up until your
-notes stop fitting in one context window. Then cost and latency scale with everything you've ever
-written down, not with what's relevant to the question at hand (~15x the tokens, ~12x the latency).
-That's the case for retrieval at all: link-expansion recall without the "re-read everything" tax as
-your notes grow.
+**vs. no memory layer.** What if you skipped retrieval entirely and just pasted the raw conversation
+(or an Obsidian vault of notes) into the prompt every time? An average LOCOMO conversation runs about
+26,031 tokens (Maharana et al. 2024), whether or not any of it is relevant to the question — cortexlayer
+retrieves 719&ndash;796, a **~97% reduction**, before the compression pass shrinks that further to
+~7 tokens/answer.
 
-Fine for a small note collection that still fits in one context window (an Obsidian vault, a single
-project's notes); not for memory that keeps growing. These are the paper's own reported numbers, not
-a cortexlayer run.
+That cost stays flat as memory grows. Pasting everything in doesn't — it scales with everything
+you've ever written down, not with what the question needs, and stops fitting in context at all once
+memory outgrows one conversation.
 
 ## Embedded engine: `Memory`
 
