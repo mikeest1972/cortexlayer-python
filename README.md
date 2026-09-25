@@ -4,14 +4,20 @@ Python library for **Cortex**, a memory layer for AI agents. Cortex stores memor
 pages and retrieves with vector search **plus link-expansion**, so multi-hop facts come back
 without over-fetching a large top-k.
 
+[![PyPI](https://img.shields.io/pypi/v/cortexlayer.svg)](https://pypi.org/project/cortexlayer/)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+&nbsp;**[Website](https://www.cortexlayer.net)** · **[Docs](https://docs.cortexlayer.net)** ·
+[GitHub](https://github.com/mikeest1972/cortexlayer-python)
+
+## 60-second start
+
 ```bash
-# Step 1 — install (run in your terminal, not in Python):
 pip install "cortexlayer[local]"
 python -m spacy download en_core_web_sm   # optional, better entity extraction
 ```
 
 ```python
-# Step 2 — save this as hello_cortex.py and run with: python hello_cortex.py
+# save as hello_cortex.py, run with: python hello_cortex.py
 from cortexlayer import Memory
 
 m = Memory("./cortex-data")   # local store; omit the path for ~/.cortexlayer
@@ -27,28 +33,35 @@ for r in m.search("Who directed Inception?", user_id="alice", limit=1):
 # Christopher Nolan was born in London in 1970. - link   <- pulled in through the shared entity
 ```
 
-No server, no API key, nothing to sign up for — it runs fully on your machine. See below for the
-hosted `CortexClient` and the `facts` engine (Mem0-style LLM fact extraction).
+No server, no API key, nothing to sign up for — it runs fully on your machine.
 
-Two ways to use it, with the same method names and result types:
-
-| | What it is | Install |
+|  | What it is | Install |
 |---|---|---|
 | **`Memory`** | The engine, embedded in your process. No server; data stays on your machine. | `pip install "cortexlayer[local]"` |
 | **`CortexClient`** | A client for a running Cortex server (hosted or self-hosted). | `pip install cortexlayer` |
 
 Python 3.10+. The client needs only `httpx`; the embedded engine adds Chroma and spaCy.
 
-> **Status: 0.1 (alpha), on PyPI as [`cortexlayer`](https://pypi.org/project/cortexlayer/).** Local
+> **Status: 0.1 (alpha)**, on PyPI as [`cortexlayer`](https://pypi.org/project/cortexlayer/). Local
 > `Memory` has two engines: `raw` (default, no LLM) and `facts` (Mem0-style LLM fact extraction; see
-> below). The Cortex server runs on this same library: its `facts` backend is `Memory(backend="facts")`,
-> and it no longer depends on the `mem0ai` package. Source: [GitHub](https://github.com/mikeest1972/cortexlayer-python).
+> below). The hosted Cortex server (**[www.cortexlayer.net](https://www.cortexlayer.net)**) runs on
+> this same library — its `facts` backend is `Memory(backend="facts")`.
+
+## Contents
+
+[Benchmarks](#benchmarks) · [Embedded engine (`Memory`)](#embedded-engine-memory) ·
+[Fact memory](#fact-memory-memorybackendfacts) · [Hosted client (`CortexClient`)](#hosted-client-cortexclient) ·
+[Async](#async) · [Results](#results) · [Errors](#errors) · [Configuration](#configuration) ·
+[Coming from Mem0](#coming-from-mem0) · [Development](#development)
 
 ## Benchmarks
 
 Measured on [LOCOMO](https://github.com/snap-research/locomo) — all 1,540 non-adversarial questions,
-`Memory(backend="raw")`, `qwen3.5:9b` as answerer, k=4 — against Mem0's own published numbers (arXiv
-2504.19413, Tables 1–2, GPT-4o-mini pipeline):
+`Memory(backend="raw")`, `qwen3.5:9b` as answerer, k=4.
+
+### vs. Mem0
+
+Against Mem0's own published numbers (arXiv 2504.19413, Tables 1–2, GPT-4o-mini pipeline):
 
 | Category | cortexlayer F1 | Mem0 F1 | cortexlayer tokens | Mem0 tokens |
 |---|---|---|---|---|
@@ -66,35 +79,30 @@ Different answerer models on each side (local `qwen3.5:9b` vs GPT-4o-mini), so t
 retrieval architecture are the fair comparison, not a fully controlled one. Deterministic token-F1,
 no LLM judge.
 
-**What about no memory layer — just raw notes (e.g. an Obsidian vault) dumped straight into the
-prompt?** Mem0's own paper runs that baseline too ("Full-Context Processing": no retrieval, the
-whole ~26k-token conversation pasted into context every query). It actually beats Mem0 on their
-LLM-judge score (72.9% vs 66.9%) — but at ~15x the tokens and ~12x the latency (p95 17.1s vs 1.44s),
-and their own paper notes it doesn't scale: cost grows with how much you've ever written down, not
-with what's relevant to the question. Fine for a small note collection that still fits in one
-context window; not for memory that keeps growing.
+### vs. no memory layer (just read the whole file)
 
-## Quickstart: embedded (`Memory`)
+The alternative to any memory layer — Cortex, Mem0, or otherwise — is: keep plain notes and paste the
+whole thing into the prompt every time, no retrieval at all. Mem0's own paper measured exactly that
+baseline ("Full-Context Processing": their full ~26k-token conversation, pasted whole, every query)
+against Mem0 itself:
 
-```bash
-pip install "cortexlayer[local]"
-python -m spacy download en_core_web_sm     # recommended: better entity extraction
-```
+| | LLM-judge score | Tokens/query | p95 latency |
+|---|---|---|---|
+| Full context (no memory layer) | **72.9%** | ~26,000 | 17.1s |
+| Mem0 | 66.9% | ~1,764 | 1.44s |
 
-```python
-from cortexlayer import Memory
+Reading the whole file actually **beats** Mem0-style memory on accuracy — right up until your notes
+stop fitting in one context window. Then cost and latency scale with everything you've ever written
+down, not with what's relevant to the question at hand (~15x the tokens, ~12x the latency of Mem0
+here). That's the case for retrieval at all: link-expansion recall without the "re-read everything"
+tax as your notes grow.
 
-m = Memory()                                 # ~/.cortexlayer, or Memory("path/to/dir")
+Fine for a small note collection that still fits in one context window (an Obsidian vault, a single
+project's notes); not for memory that keeps growing. These are Mem0's own reported numbers, not a
+cortexlayer run — cortexlayer doesn't yet have a matching LLM-judge score to compare directly (its
+LOCOMO numbers above are token-F1).
 
-m.add("Christopher Nolan directed Inception.", user_id="alice")
-m.add("Christopher Nolan was born in London in 1970.", user_id="alice")
-m.relink(user_id="alice")                    # batch linking pass: run after adding several
-
-m.search("Who directed Inception?", user_id="alice", limit=1)
-# [SearchResult(title='Christopher Nolan directed Inception.', via='direct', …),
-#  SearchResult(title='Christopher Nolan was born in London in 1970.',
-#               via='link', linked_from='…')]   <- pulled in through the shared entity
-```
+## Embedded engine: `Memory`
 
 - **One store, many users:** every call takes an optional `user_id`; each user gets an isolated
   collection, so users can never see each other's pages. Omit it and the default user is used.
@@ -152,15 +160,15 @@ m.search("What is Caroline's dog called?", user_id="alice")   # -> "Caroline ado
   conversation's date. `observation_date_from_timestamp=True` passes your `add(timestamp=...)` as that date.
 - **Exact words:** embedding scores are often compressed into a narrow band, so a fact that literally contains
   a query word can rank below generic ones. Search fuses a BM25 keyword score by default (`keyword_scoring=False`
-  gives plain semantic + entity scoring, identical to Mem0 on Chroma; on a small LOCOMO subset it lifted F1 from 0.37 to 0.47 at the same token cost — not yet a
-  statistical result).
+  gives plain semantic + entity scoring, identical to Mem0 on Chroma; on a small LOCOMO subset it lifted F1 from
+  0.37 to 0.47 at the same token cost — not yet a statistical result).
 - **Facts are ordinary pages:** each fact is stored as a page in the user's Chroma collection, so links are
   persisted and `get` / `get_all` / `update` / `delete` work on facts exactly as on raw pages.
 - **Origin:** the extraction prompt and pipeline are adapted from [Mem0](https://github.com/mem0ai/mem0)
   (Apache-2.0); cortexlayer does not depend on the `mem0ai` package. See `NOTICE`. The larger
   multi-conversation comparison against Mem0 is still open.
 
-## Quickstart: hosted (`CortexClient`)
+## Hosted client: `CortexClient`
 
 ```bash
 pip install cortexlayer
@@ -179,8 +187,8 @@ client.get_all(limit=50)                    # browse pages
 client.get(page_id)                         # one page + its links
 ```
 
-Create a key in the Cortex web app (**Keys**). Point at a self-hosted server with
-`base_url="http://localhost:8000"` (or `CORTEX_BASE_URL`).
+Create a key at **[www.cortexlayer.net](https://www.cortexlayer.net)** (**Keys**). Point at a
+self-hosted server with `base_url="http://localhost:8000"` (or `CORTEX_BASE_URL`).
 
 Writes:
 
@@ -296,3 +304,8 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
 ## Licence
 
 [Apache-2.0](LICENSE).
+
+---
+
+**[www.cortexlayer.net](https://www.cortexlayer.net)** · **[docs.cortexlayer.net](https://docs.cortexlayer.net)** ·
+[GitHub](https://github.com/mikeest1972/cortexlayer-python) · [PyPI](https://pypi.org/project/cortexlayer/)
