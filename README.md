@@ -64,8 +64,7 @@ a genuine reasoning-capacity edge there that retrieval quality alone doesn't clo
 
 Different answerer models on each side (local `qwen3.5:9b` vs GPT-4o-mini), so token counts and
 retrieval architecture are the fair comparison, not a fully controlled one. Deterministic token-F1,
-no LLM judge. Reproduce with the benchmark harness in the Cortex server repo
-(`benchmark/run_locomo.py` + `benchmark/compare_mem0.py`).
+no LLM judge.
 
 **What about no memory layer — just raw notes (e.g. an Obsidian vault) dumped straight into the
 prompt?** Mem0's own paper runs that baseline too ("Full-Context Processing": no retrieval, the
