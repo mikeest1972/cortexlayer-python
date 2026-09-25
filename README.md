@@ -56,51 +56,26 @@ Python 3.10+. The client needs only `httpx`; the embedded engine adds Chroma and
 
 ## Benchmarks
 
-Measured on [LOCOMO](https://github.com/snap-research/locomo) — all 1,540 non-adversarial questions,
-`Memory(backend="raw")`, `qwen3.5:9b` as answerer, k=4.
-
-### vs. Mem0
-
-Against Mem0's own published numbers (arXiv 2504.19413, Tables 1–2, GPT-4o-mini pipeline):
-
-| Category | cortexlayer F1 | Mem0 F1 | cortexlayer tokens | Mem0 tokens |
-|---|---|---|---|---|
-| single-hop | 0.357 | 0.387 | 719 | 1,764 |
-| multi-hop | 0.273 | 0.286 | 796 | 1,764 |
-| temporal | 0.480 | 0.489 | 740 | 1,764 |
-| open-domain | 0.170 | 0.476 | 751 | 1,764 |
-
-**Near-parity with Mem0 on 3 of 4 categories**, at ~55&ndash;60% fewer retrieval tokens — plus a
-compression pass that shrinks context further to ~7 tokens/answer, a lever Mem0 has no equivalent of.
-Open-domain (inference/judgment questions, not fact lookup) is the one real gap left: GPT-4o-mini has
-a genuine reasoning-capacity edge there that retrieval quality alone doesn't close.
-
-Different answerer models on each side (local `qwen3.5:9b` vs GPT-4o-mini), so token counts and
-retrieval architecture are the fair comparison, not a fully controlled one. Deterministic token-F1,
-no LLM judge.
-
-### vs. no memory layer (just read the whole file)
-
-The alternative to any memory layer — Cortex, Mem0, or otherwise — is: keep plain notes and paste the
-whole thing into the prompt every time, no retrieval at all. Mem0's own paper measured exactly that
-baseline ("Full-Context Processing": their full ~26k-token conversation, pasted whole, every query)
-against Mem0 itself:
+Why bother with a memory layer at all, instead of just keeping plain notes and pasting the whole
+thing into the prompt every time? Measured on [LOCOMO](https://github.com/snap-research/locomo),
+citing a published ablation (arXiv 2504.19413) that ran exactly that baseline — "Full-Context
+Processing": the full ~26k-token conversation, pasted whole, every query — against a retrieval-based
+memory layer:
 
 | | LLM-judge score | Tokens/query | p95 latency |
 |---|---|---|---|
 | Full context (no memory layer) | **72.9%** | ~26,000 | 17.1s |
-| Mem0 | 66.9% | ~1,764 | 1.44s |
+| Retrieval-based memory | 66.9% | ~1,764 | 1.44s |
 
-Reading the whole file actually **beats** Mem0-style memory on accuracy — right up until your notes
-stop fitting in one context window. Then cost and latency scale with everything you've ever written
-down, not with what's relevant to the question at hand (~15x the tokens, ~12x the latency of Mem0
-here). That's the case for retrieval at all: link-expansion recall without the "re-read everything"
-tax as your notes grow.
+Reading the whole file actually **beats** retrieval-based memory on accuracy — right up until your
+notes stop fitting in one context window. Then cost and latency scale with everything you've ever
+written down, not with what's relevant to the question at hand (~15x the tokens, ~12x the latency).
+That's the case for retrieval at all: link-expansion recall without the "re-read everything" tax as
+your notes grow.
 
 Fine for a small note collection that still fits in one context window (an Obsidian vault, a single
-project's notes); not for memory that keeps growing. These are Mem0's own reported numbers, not a
-cortexlayer run — cortexlayer doesn't yet have a matching LLM-judge score to compare directly (its
-LOCOMO numbers above are token-F1).
+project's notes); not for memory that keeps growing. These are the paper's own reported numbers, not
+a cortexlayer run.
 
 ## Embedded engine: `Memory`
 
