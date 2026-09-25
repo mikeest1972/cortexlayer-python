@@ -12,33 +12,33 @@ without over-fetching a large top-k.
 ## 60-second start
 
 ```bash
-pip install "cortexlayer[local]"
-python -m spacy download en_core_web_sm   # optional, better entity extraction
+pip install cortexlayer
 ```
 
 ```python
 # save as hello_cortex.py, run with: python hello_cortex.py
-from cortexlayer import Memory
+from cortexlayer import CortexClient
 
-m = Memory("./cortex-data")   # local store; omit the path for ~/.cortexlayer
+# get a free key at https://www.cortexlayer.net (Keys), or set CORTEX_API_KEY
+client = CortexClient(api_key="...")
 
-m.add("Christopher Nolan directed Inception.", user_id="alice")
-m.add("Christopher Nolan was born in London in 1970.", user_id="alice")
-m.relink(user_id="alice")     # batch linking pass, run after adding several
+client.add("Christopher Nolan directed Inception.")
+client.add("Christopher Nolan was born in London in 1970.")
 
-for r in m.search("Who directed Inception?", user_id="alice", limit=1):
+for r in client.search("Who directed Inception?", limit=1):
     print(r.title, "-", r.via)
 
 # Christopher Nolan directed Inception. - direct
 # Christopher Nolan was born in London in 1970. - link   <- pulled in through the shared entity
 ```
 
-No server, no API key, nothing to sign up for — it runs fully on your machine.
+No local setup, no models to download — create a key at
+**[www.cortexlayer.net](https://www.cortexlayer.net)** and you're running.
 
 |  | What it is | Install |
 |---|---|---|
-| **`Memory`** | The engine, embedded in your process. No server; data stays on your machine. | `pip install "cortexlayer[local]"` |
 | **`CortexClient`** | A client for a running Cortex server (hosted or self-hosted). | `pip install cortexlayer` |
+| **`Memory`** | The engine, embedded in your own process instead. No server; data stays on your machine. | `pip install "cortexlayer[local]"` |
 
 Python 3.10+. The client needs only `httpx`; the embedded engine adds Chroma and spaCy.
 
@@ -49,10 +49,10 @@ Python 3.10+. The client needs only `httpx`; the embedded engine adds Chroma and
 
 ## Contents
 
-[Benchmarks](#benchmarks) · [Embedded engine (`Memory`)](#embedded-engine-memory) ·
-[Fact memory](#fact-memory-memorybackendfacts) · [Hosted client (`CortexClient`)](#hosted-client-cortexclient) ·
-[Async](#async) · [Results](#results) · [Errors](#errors) · [Configuration](#configuration) ·
-[Coming from Mem0](#coming-from-mem0) · [Development](#development)
+[Benchmarks](#benchmarks) · [Hosted client (`CortexClient`)](#hosted-client-cortexclient) ·
+[Async](#async) · [Embedded engine (`Memory`)](#embedded-engine-memory) ·
+[Fact memory](#fact-memory-memorybackendfacts) · [Results](#results) · [Errors](#errors) ·
+[Configuration](#configuration) · [Coming from Mem0](#coming-from-mem0) · [Development](#development)
 
 ## Benchmarks
 
@@ -77,7 +77,56 @@ That cost stays flat as memory grows. Pasting everything in doesn't — it scale
 you've ever written down, not with what the question needs, and stops fitting in context at all once
 memory outgrows one conversation.
 
+## Hosted client: `CortexClient`
+
+```bash
+pip install cortexlayer
+```
+
+```python
+from cortexlayer import CortexClient
+
+client = CortexClient(api_key="...")        # or set CORTEX_API_KEY
+
+client.search("Where does Alice live?", limit=5)
+# [SearchResult(id='…', title='Alice moved to Lisbon in March.', via='direct', …),
+#  SearchResult(id='…', title='…', via='link', linked_from='…'), …]
+
+client.get_all(limit=50)                    # browse pages
+client.get(page_id)                         # one page + its links
+```
+
+Create a key at **[www.cortexlayer.net](https://www.cortexlayer.net)** (**Keys**). Point at a
+self-hosted server with `base_url="http://localhost:8000"` (or `CORTEX_BASE_URL`).
+
+Writes:
+
+```python
+client.add("I moved to Lisbon in March.")   # long text is chunked into several pages
+client.update(page_id, "…")
+client.delete(page_id)
+client.relink()                             # re-run the batch linking pass after adding several
+```
+
+> **Writes need a server with REST write endpoints** (added in Cortex server task 0073; the hosted
+> server has them). Against an older self-hosted server these four raise `WritesNotSupportedError`;
+> reads, search, graph and usage work on every version.
+
+### Async
+
+```python
+from cortexlayer import AsyncCortexClient
+
+async with AsyncCortexClient(api_key="...") as client:
+    hits = await client.search("Where does Alice live?")
+```
+
+Same methods, awaited.
+
 ## Embedded engine: `Memory`
+
+Prefer running fully on your own machine instead, with no server and no account? `Memory` is the
+same engine, embedded in your process.
 
 - **One store, many users:** every call takes an optional `user_id`; each user gets an isolated
   collection, so users can never see each other's pages. Omit it and the default user is used.
@@ -93,6 +142,20 @@ memory outgrows one conversation.
 - **Short answers (optional):** `m.answer("Where did Alice move?")` retrieves and has an LLM distil a
   direct answer plus the supporting page ids. It uses a local Ollama by default
   (`$OLLAMA_HOST`); pass `chat=fn(prompt, model) -> str` to use any model.
+
+```bash
+pip install "cortexlayer[local]"
+python -m spacy download en_core_web_sm   # optional, better entity extraction
+```
+
+```python
+from cortexlayer import Memory
+
+m = Memory("./cortex-data")   # local store; omit the path for ~/.cortexlayer
+
+m.add("Christopher Nolan directed Inception.", user_id="alice")
+m.search("Who directed Inception?", user_id="alice", limit=1)
+```
 
 | `Memory` method | Returns |
 |---|---|
@@ -142,52 +205,6 @@ m.search("What is Caroline's dog called?", user_id="alice")   # -> "Caroline ado
 - **Origin:** the extraction prompt and pipeline are adapted from [Mem0](https://github.com/mem0ai/mem0)
   (Apache-2.0); cortexlayer does not depend on the `mem0ai` package. See `NOTICE`. The larger
   multi-conversation comparison against Mem0 is still open.
-
-## Hosted client: `CortexClient`
-
-```bash
-pip install cortexlayer
-```
-
-```python
-from cortexlayer import CortexClient
-
-client = CortexClient(api_key="...")        # or set CORTEX_API_KEY
-
-client.search("Where does Alice live?", limit=5)
-# [SearchResult(id='…', title='Alice moved to Lisbon in March.', via='direct', …),
-#  SearchResult(id='…', title='…', via='link', linked_from='…'), …]
-
-client.get_all(limit=50)                    # browse pages
-client.get(page_id)                         # one page + its links
-```
-
-Create a key at **[www.cortexlayer.net](https://www.cortexlayer.net)** (**Keys**). Point at a
-self-hosted server with `base_url="http://localhost:8000"` (or `CORTEX_BASE_URL`).
-
-Writes:
-
-```python
-client.add("I moved to Lisbon in March.")   # long text is chunked into several pages
-client.update(page_id, "…")
-client.delete(page_id)
-client.relink()                             # re-run the batch linking pass after adding several
-```
-
-> **Writes need a server with REST write endpoints** (added in Cortex server task 0073; the hosted
-> server has them). Against an older self-hosted server these four raise `WritesNotSupportedError`;
-> reads, search, graph and usage work on every version.
-
-### Async
-
-```python
-from cortexlayer import AsyncCortexClient
-
-async with AsyncCortexClient(api_key="...") as client:
-    hits = await client.search("Where does Alice live?")
-```
-
-Same methods, awaited.
 
 ## Results
 
