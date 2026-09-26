@@ -23,8 +23,8 @@ classifiers = [
 [project.urls]
 Homepage = "https://www.cortexlayer.net"
 Documentation = "https://docs.cortexlayer.net"
-Repository = "https://github.com/mikeest1972/cortexlayer-python"
-Issues = "https://github.com/mikeest1972/cortexlayer-python/issues"
+Repository = "https://github.com/Cortex-Layer/cortexlayer-python"
+Issues = "https://github.com/Cortex-Layer/cortexlayer-python/issues"
 
 [project.optional-dependencies]
 # The embedded engine (`Memory`): Chroma vector store + spaCy entity extraction.

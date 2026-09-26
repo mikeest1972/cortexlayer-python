@@ -7,7 +7,7 @@ without over-fetching a large top-k.
 [![PyPI](https://img.shields.io/pypi/v/cortexlayer.svg)](https://pypi.org/project/cortexlayer/)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 &nbsp;**[Website](https://www.cortexlayer.net)** · **[Docs](https://docs.cortexlayer.net)** ·
-[GitHub](https://github.com/mikeest1972/cortexlayer-python)
+[GitHub](https://github.com/Cortex-Layer/cortexlayer-python)
 
 ## 60-second start
 
@@ -301,4 +301,4 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
 ---
 
 **[www.cortexlayer.net](https://www.cortexlayer.net)** · **[docs.cortexlayer.net](https://docs.cortexlayer.net)** ·
-[GitHub](https://github.com/mikeest1972/cortexlayer-python) · [PyPI](https://pypi.org/project/cortexlayer/)
+[GitHub](https://github.com/Cortex-Layer/cortexlayer-python) · [PyPI](https://pypi.org/project/cortexlayer/)
