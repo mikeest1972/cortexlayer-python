@@ -52,6 +52,59 @@ def test_no_self_links_and_case_insensitive(tmp_path):
     assert storage.get_page(col, b)["links"] == [a]
 
 
+def test_moderately_common_entity_alone_does_not_link(tmp_path):
+    col = _fresh_collection(tmp_path)
+    # "Project" sits on 4 of 5 pages (df=4, weight=0.25) — under the
+    # common-entity cutoff (threshold=5) so it's still "linkable", but too
+    # weak on its own (0.25 < default min_link_weight=0.5) to link any pair.
+    # Old plain "shares >=1 entity" linking would have linked all 4 into a
+    # clique; weighted scoring should leave them unlinked.
+    ids = [storage.insert_page(col, f"Page {i}.", ["Project", f"topic{i}"]) for i in range(4)]
+    storage.insert_page(col, "Unrelated filler.", ["Filler"])
+    linking.run_linking_pass(col)
+    for page_id in ids:
+        assert storage.get_page(col, page_id)["links"] == []
+
+
+def test_two_shared_entities_combine_to_link(tmp_path):
+    col = _fresh_collection(tmp_path)
+    # "Project" (df=4, weight 0.25) and "Widget" (df=4, weight 0.25) are each
+    # too weak alone (< default min_link_weight=0.3). A and B share both, so
+    # their combined score (0.5) clears the bar; pages sharing only one of
+    # the two (C/D via Project, E/F via Widget) stay unlinked.
+    a = storage.insert_page(col, "Page A.", ["Project", "Widget"])
+    b = storage.insert_page(col, "Page B.", ["Project", "Widget"])
+    c = storage.insert_page(col, "Page C.", ["Project"])
+    d = storage.insert_page(col, "Page D.", ["Project"])
+    e = storage.insert_page(col, "Page E.", ["Widget"])
+    f = storage.insert_page(col, "Page F.", ["Widget"])
+    linking.run_linking_pass(col)
+    assert storage.get_page(col, a)["links"] == [b]
+    assert storage.get_page(col, b)["links"] == [a]
+    for page_id in (c, d, e, f):
+        assert storage.get_page(col, page_id)["links"] == []
+
+
+def test_max_links_per_page_caps_a_hub(tmp_path):
+    col = _fresh_collection(tmp_path / "hub")
+    # A hub page shares a distinct rare entity (df=2, weight=0.5) with each
+    # of 20 other pages — every pair clears min_link_weight on its own, so
+    # without a cap the hub would collect 20 links. It should keep only its
+    # top max_links_per_page.
+    hub = storage.insert_page(col, "Hub page.", [f"shared{i}" for i in range(20)])
+    leaves = [storage.insert_page(col, f"Leaf {i}.", [f"shared{i}"]) for i in range(20)]
+    linking.run_linking_pass(col)
+    hub_links = storage.get_page(col, hub)["links"]
+    assert len(hub_links) == 12  # default max_links_per_page
+    assert set(hub_links) <= set(leaves)
+    # Mutual top-K: a leaf the hub didn't keep loses the edge on its side
+    # too (it's not "hub isn't in my top-K", every leaf's only candidate IS
+    # the hub — it's that the hub didn't reciprocate).
+    dropped = [leaf for leaf in leaves if leaf not in hub_links]
+    assert dropped and all(storage.get_page(col, leaf)["links"] == [] for leaf in dropped)
+    assert all(storage.get_page(col, leaf)["links"] == [hub] for leaf in hub_links)
+
+
 def test_ubiquitous_entity_creates_no_links(tmp_path):
     col = _fresh_collection(tmp_path)
     # "Common" on all 6 pages exceeds the min-pages floor → ignored for links.
